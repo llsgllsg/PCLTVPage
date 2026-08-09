@@ -1,0 +1,7 @@
+.venv/
+.vscode/
+test/
+__pycache__/
+cache/
+TVPage.xaml
+TVPage.xaml.ini

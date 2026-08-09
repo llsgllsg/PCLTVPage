@@ -1,0 +1,18 @@
+<local:MyCard Grid.Row="{row}" Grid.Column="{column}" Margin="5" UseAnimation="False">
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Grid.Column="0" Text="{rank}" FontSize="30" FontWeight="Bold"
+                   Foreground="{DynamicResource ColorBrush3}" VerticalAlignment="Center"
+                   Margin="4,0,14,0" />
+        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+            <TextBlock FontSize="16" FontWeight="Bold" TextWrapping="Wrap"
+                       Foreground="{DynamicResource ColorBrush1}" Text="{name}" />
+            <TextBlock Margin="0,3,0,0" FontSize="12" FontWeight="Bold" TextWrapping="Wrap"
+                       Foreground="{DynamicResource ColorBrush4}" Text="{meta}" />
+            {buttons}
+        </StackPanel>
+    </Grid>
+</local:MyCard>

@@ -1,0 +1,73 @@
+name: TVPage
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: pip install requests
+
+      - name: 生成 XAML
+        env:
+          UAPI_API_KEY: ${{ secrets.UAPI_API_KEY }}
+        run: python main.py
+
+      - name: 检查生成的文件
+        run: |
+          if [ -f "TVPage.xaml" ]; then
+            echo "文件已生成"
+            ls -la TVPage.xaml
+          else
+            echo "文件未生成，请检查脚本"
+            exit 1
+          fi
+
+      - name: 安装 sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: 确保远程目录存在
+        run: |
+          sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT || 22 }} \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "mkdir -p ${{ secrets.SSH_PATH }}"
+
+      - name: 上传 XAML 文件
+        run: |
+          for i in 1 2; do
+            echo "尝试上传 XAML (第 $i 次)"
+            if sshpass -p '${{ secrets.SSH_PASSWORD }}' scp -o StrictHostKeyChecking=no -P ${{ secrets.SSH_PORT || 22 }} \
+                TVPage.xaml \
+                ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.SSH_PATH }}/; then
+              echo "XAML 上传成功"
+              exit 0
+            else
+              echo "上传失败，等待重试..."
+              sleep 5
+            fi
+          done
+          echo "上传失败，放弃"
+          exit 1
+
+      - name: 在远程创建/覆盖版本号文件 TVPage.xaml.ini
+        run: |
+          TIMESTAMP=$(date -u +%s)
+          sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT || 22 }} \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "echo $TIMESTAMP > ${{ secrets.SSH_PATH }}/TVPage.xaml.ini"
+          echo "版本号已更新: $TIMESTAMP"
