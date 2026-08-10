@@ -3,5 +3,6 @@
 test/
 __pycache__/
 cache/
+backup/
 TVPage.xaml
 TVPage.xaml.ini

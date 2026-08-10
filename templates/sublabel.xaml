@@ -1,2 +1,0 @@
-<TextBlock Text="{label}" FontSize="16" FontWeight="Bold" Margin="0,10,0,4"
-           Foreground="{DynamicResource ColorBrush2}" />
