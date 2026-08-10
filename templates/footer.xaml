@@ -3,7 +3,7 @@
         <TextBlock TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center"
                    FontSize="14" FontWeight="Bold"
                    Foreground="Black"
-                   Text="作者:llsgllsg · 数据来源:UAPI(uapis.cn) 电影收视排行 · 本主页使用 GPL-3.0 协议" />
+                   Text="作者:llsgllsg · 本主页使用 GPL-3.0 协议" />
     </Grid>
 </local:MyCard>
 </StackPanel>

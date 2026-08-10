@@ -38,7 +38,7 @@ import urllib.parse
 
 import uapi_api
 
-LABEL = "影视排行"
+LABEL = "影视剧热门"
 LIMIT = 12
 TEMPLATE_DIR = "templates"
 OUTPUT_XAML = "TVPage.xaml"
@@ -78,7 +78,7 @@ PERIOD_CN = {
 }
 
 # 每行"搜索"按钮的搜索引擎(可改): 百度 / cn.bing / google 等
-SEARCH_ENGINE = "https://www.baidu.com/s?wd="
+SEARCH_ENGINE = "https://www.bing.com/search?q="
 # 搜索(放大镜)与链接图标(用于 MyIconButton)
 SEARCH_ICON = "M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
 LINK_ICON = "M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z"
