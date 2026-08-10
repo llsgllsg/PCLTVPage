@@ -79,9 +79,11 @@ PERIOD_CN = {
 
 # 每行"搜索"按钮的搜索引擎(可改): 百度 / cn.bing / google 等
 SEARCH_ENGINE = "https://www.bing.com/search?q="
-# 搜索(放大镜)与链接图标(用于 MyIconButton)
+# 院线行的"豆瓣查看"入口(豆瓣浏览无需登录, 替代猫眼详情)
+DOUBAN_SEARCH = "https://search.douban.com/movie/subject_search?search_text="
+# 搜索(放大镜)与电影(胶片)图标(用于 MyIconButton)
 SEARCH_ICON = "M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
-LINK_ICON = "M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z"
+MOVIE_ICON = "M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"
 
 
 def escape_xaml(text) -> str:
@@ -258,7 +260,10 @@ def format_metric(metric) -> str:
 
 
 def build_row_buttons_xaml(item: dict) -> str:
-    """行末按钮: 每行一个"搜索"(用搜索引擎查该剧集), 院线行额外加"猫眼详情"。"""
+    """行末按钮: 每行一个"搜索"(必应查该剧集); 院线行额外加"豆瓣查看"(豆瓣浏览无需登录, 替代猫眼详情)。
+
+    是否院线行用 item 是否带 detail_url(猫眼链接) 判断, 有则为院线电影。
+    """
     title = item.get("name") or ""
     search_url = SEARCH_ENGINE + urllib.parse.quote(title)
     parts = [
@@ -266,12 +271,12 @@ def build_row_buttons_xaml(item: dict) -> str:
         f'VerticalAlignment="Center" ToolTip="搜索相关资讯" EventType="打开网页" '
         f'EventData="{escape_xaml(search_url)}" LogoScale="0.9" Logo="{SEARCH_ICON}" />'
     ]
-    detail = item.get("detail_url")
-    if detail:
+    if item.get("detail_url"):
+        douban_url = DOUBAN_SEARCH + urllib.parse.quote(title)
         parts.append(
             f'<local:MyIconButton Width="20" Height="20" Margin="4,0,0,0" Theme="Color" '
-            f'VerticalAlignment="Center" ToolTip="猫眼详情" EventType="打开网页" '
-            f'EventData="{escape_xaml(detail)}" LogoScale="0.9" Logo="{LINK_ICON}" />'
+            f'VerticalAlignment="Center" ToolTip="豆瓣查看" EventType="打开网页" '
+            f'EventData="{escape_xaml(douban_url)}" LogoScale="0.9" Logo="{MOVIE_ICON}" />'
         )
     return (
         '<StackPanel Orientation="Horizontal" Grid.Column="3" VerticalAlignment="Center">\n'
@@ -416,7 +421,7 @@ def main() -> int:
             for it in (group.get("items") or [])[:limit]:
                 print(f"  #{it.get('rank'):>3} {it.get('name')} | {format_metric(it.get('metric'))} | 份额 {it.get('metric_rate')}"
                       + f" | 搜 {SEARCH_ENGINE}{urllib.parse.quote(str(it.get('name') or ''))}"
-                      + (f" | 详情 {it.get('detail_url')}" if it.get("detail_url") else ""))
+                      + (f" | 豆瓣 {DOUBAN_SEARCH}{urllib.parse.quote(str(it.get('name') or ''))}" if it.get("detail_url") else ""))
             slices = donut_slices(group)
             if slices:
                 print("  饼图(头部5名相对占比): " + "  ".join(
