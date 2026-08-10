@@ -70,4 +70,4 @@ jobs:
           sshpass -p '${{ secrets.SSH_PASSWORD }}' ssh -o StrictHostKeyChecking=no -p ${{ secrets.SERVER_PORT || 22 }} \
             ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
             "echo $TIMESTAMP > ${{ secrets.SERVER_PATH }}/TVPage.xaml.ini"
-          echo "版本号已更新: $TIMESTAMP"
+          echo "版本: $TIMESTAMP"
