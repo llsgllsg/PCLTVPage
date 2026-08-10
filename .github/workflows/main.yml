@@ -2,7 +2,8 @@ name: TVPage
 
 on:
   schedule:
-    - cron: '17 */6 * * *'
+    # 每天北京时间凌晨 04:00 更新 (GitHub Actions cron 用 UTC, 04:00 CST = 20:00 UTC)
+    - cron: '0 20 * * *'
   workflow_dispatch:
 
 jobs:

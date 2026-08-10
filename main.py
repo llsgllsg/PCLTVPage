@@ -45,9 +45,9 @@ OUTPUT_INI = "TVPage.xaml.ini"   # PCL2 用于判断页面是否更新的版本�
 
 # ---------- 环形图参数 ----------
 DONUT_TOP_N = 5          # 每张饼图展示头部 N 条(份额为归一化相对占比)
-DONUT_SIZE = 160         # 画布边长
-DONUT_R = 52             # 环半径(中线)
-DONUT_STROKE = 24        # 环粗细
+DONUT_SIZE = 150         # 画布边长
+DONUT_R = 48             # 环半径(中线)
+DONUT_STROKE = 22        # 环粗细
 # 分类色: 校验过的 8 槽调色板, 固定顺序不循环(第 9 项起并入"其他")
 PALETTE = [
     "#2a78d6",  # blue
@@ -180,37 +180,41 @@ def build_donut_legend(group: dict, slices: list[dict]) -> str:
             f'    <Rectangle Width="10" Height="10" RadiusX="2" RadiusY="2" Fill="{s["color"]}" VerticalAlignment="Center" />\n'
             f'    <TextBlock Text="{escape_xaml(s["name"])}" FontSize="12" '
             f'Foreground="{{DynamicResource ColorBrush2}}" Margin="6,0,0,0" '
-            f'MaxWidth="150" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />\n'
+            f'MaxWidth="110" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />\n'
             f'    <TextBlock Text="{s["pct"]:.1f}%" FontSize="12" FontWeight="Bold" '
             f'Foreground="{{DynamicResource ColorBrush4}}" Margin="8,0,0,0" VerticalAlignment="Center" />\n'
             "</StackPanel>"
         )
     return (
-        '<StackPanel Margin="14,0,0,0" VerticalAlignment="Center">\n'
+        '<StackPanel Margin="0,12,0,0" HorizontalAlignment="Center">\n'
         f'    <TextBlock Text="{escape_xaml(desc + " · 头部5名相对占比")}" FontSize="13" FontWeight="Bold" '
-        f'Foreground="{{DynamicResource ColorBrush2}}" Margin="0,0,0,6" />\n'
+        f'Foreground="{{DynamicResource ColorBrush2}}" HorizontalAlignment="Center" Margin="0,0,0,6" />\n'
         + "\n".join(rows)
         + "\n</StackPanel>"
     )
 
 
 def build_donut_block(group: dict, column: int) -> str:
-    """一个渠道的"环形图 + 图例"水平块, 放在占比卡片的第 column 列。"""
+    """一个渠道的"环形图 + 图例"块(图例竖排在环形图下方, 放在第 column 列)。
+
+    采用教程「进阶: Grid 布局」的自动缩放方式: 外层 Grid 用星号列(1*),
+    宽度随窗口自适应, 块内宽度 = 环形图与图例的较宽者, 小屏也不会溢出被裁剪。
+    """
     slices = donut_slices(group)
     if not slices:
         return ""
     canvas = build_donut_canvas(slices)
     legend = build_donut_legend(group, slices)
     return (
-        f'<StackPanel Grid.Column="{column}" Orientation="Horizontal" '
-        f'HorizontalAlignment="Center" VerticalAlignment="Center">\n'
-        + canvas + "\n" + legend + "\n"
+        f'<StackPanel Grid.Column="{column}" HorizontalAlignment="Center" VerticalAlignment="Center">\n'
+        + canvas + "\n"
+        + legend + "\n"
         + "</StackPanel>"
     )
 
 
 def build_donut_card(groups: list[dict]) -> str:
-    """"影视占比"卡片: 各渠道环形图并排。"""
+    """"影视占比"卡片: 各渠道环形图放两列星号 Grid, 随窗口宽度自适应。"""
     blocks = [build_donut_block(g, i) for i, g in enumerate(groups)]
     blocks = [b for b in blocks if b]
     if not blocks:
