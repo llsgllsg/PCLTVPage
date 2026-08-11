@@ -1,41 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-uapi_api.py — UAPI (uapis.cn) 电影收视排行接口客户端。
 
-完整 API 地址: https://uapis.cn/api/v1/misc/movie-rating-rank
-鉴权: 免费档无需密钥; 付费档在请求头 Authorization: Bearer <KEY> 中携带密钥,
-      KEY 以 uapi- 开头, 从环境变量 UAPI_API_KEY 读取, 不硬编码、不拼进 URL。
-      UAPI_API_KEY 未设置时, 以免费档调用(本接口实测无需密钥即可访问)。
-
-用法(供 main.py 调用):
-    data = uapi_api.get_movie_rating_rank(channel="all", limit=12, period="realtime")
-
-返回结构(已归一化, 兼容线上真实返回与文档示例):
-    {
-      "period": "realtime",
-      "date": "2026-08-09" | None,
-      "groups": [
-        {
-          "channel": "tv",            # all/tv/web/cinema
-          "channel_desc": "电视收视",
-          "metric_label": "收视率",
-          "items": [ { "rank": 1, "name": "...", "channel": "CCTV-6",
-                       "metric": "17.7019%", "metric_rate": "2.8226%",
-                       "detail_url": None } ],
-        },
-        ...
-      ],
-    }
-
-边界处理:
-    * 参数校验: channel/period 白名单、limit 范围、date 格式与必填
-    * 请求超时 + 网络异常重试(指数退避)
-    * 非 2xx: 解析 {"code","message"}; 400 INVALID_PARAMETER 直接报错,
-      404 SNAPSHOT_NOT_FOUND 直接报错, 429/5xx 带退避重试(尊重 Retry-After)
-    * 限流: 按接口建议平均请求保持在 40 次/分钟以内; 本模块默认带 30 分钟文件缓存,
-      大幅降低调用频率
-"""
 from __future__ import annotations
 
 import json
@@ -46,12 +11,11 @@ from datetime import datetime
 import requests
 
 API_BASE = "https://uapis.cn/api/v1"
-# 完整 API 地址整条照用(含 /api/v1 版本前缀), 不自行拼接
 ENDPOINT = API_BASE + "/misc/movie-rating-rank"
 
-DEFAULT_TIMEOUT = 60        # 秒(历史快照查询可能较慢)
-DEFAULT_MAX_RETRIES = 3     # 失败重试次数(不含首次请求)
-DEFAULT_TTL = 30 * 60       # 响应缓存 30 分钟
+DEFAULT_TIMEOUT = 60        
+DEFAULT_MAX_RETRIES = 3     
+DEFAULT_TTL = 30 * 60       
 CACHE_DIR = "cache"
 
 CHANNELS = ("all", "tv", "web", "cinema")
@@ -59,7 +23,6 @@ PERIODS = ("realtime", "day", "week", "month")
 DATE_FMT = "%Y-%m-%d"
 MIN_LIMIT, MAX_LIMIT = 1, 100
 
-# 可重试的状态码: 限流与服务器瞬时错误
 _RETRY_STATUS = {429, 500, 502, 503, 504}
 
 HEADERS = {
@@ -68,7 +31,6 @@ HEADERS = {
 
 
 class UapiError(Exception):
-    """接口调用错误。code/message 来自接口返回体, status 为 HTTP 状态码。"""
 
     def __init__(self, code, message, status):
         super().__init__(message or f"HTTP {status}")
@@ -78,7 +40,6 @@ class UapiError(Exception):
 
 
 def get_api_key() -> str | None:
-    """从环境变量读取 API Key。未设置或为空时返回 None(以免费档调用)。"""
     key = os.environ.get("UAPI_API_KEY", "").strip()
     return key or None
 
@@ -86,7 +47,6 @@ def get_api_key() -> str | None:
 def validate_params(channel: str = "all", platform: str | None = None,
                     limit: int = 10, period: str = "realtime",
                     date: str | None = None):
-    """参数校验。非法参数抛出 ValueError, 否则返回规整后的元组。"""
     if channel not in CHANNELS:
         raise ValueError(f"channel 必须是 {list(CHANNELS)} 之一, 收到: {channel!r}")
     if period not in PERIODS:
@@ -112,11 +72,7 @@ def validate_params(channel: str = "all", platform: str | None = None,
 
 
 def _normalize(data: dict) -> dict:
-    """把接口返回统一为固定结构。
 
-    线上真实返回是 groups[].list[]; 若接口按文档示例改为 channels[].items[],
-    这里也能兼容解析(文档示例字段: rank/title/score/hot_value)。
-    """
     groups = []
 
     if isinstance(data.get("groups"), list):
@@ -159,7 +115,7 @@ def _normalize(data: dict) -> dict:
     }
 
 
-# ----------------------------- 缓存 -----------------------------
+
 
 def _cache_file(query: dict) -> str:
     key = "_".join(f"{k}:{v}" for k, v in query.items())
@@ -189,7 +145,6 @@ def _save_cache(path: str, data: dict) -> None:
         pass
 
 
-# --------------------------- 请求与重试 ---------------------------
 
 def _retry_after(resp) -> float | None:
     ra = resp.headers.get("Retry-After")
@@ -218,17 +173,7 @@ def get_movie_rating_rank(channel: str = "all", platform: str | None = None,
                           max_retries: int = DEFAULT_MAX_RETRIES,
                           use_cache: bool = True,
                           ttl: float = DEFAULT_TTL) -> dict:
-    """查询电影收视/热度/票房排行。返回归一化 dict(见模块 docstring)。
 
-    参数与接口文档一一对应:
-        channel  all/tv/web/cinema(默认 all)
-        platform 按渠道或平台关键字过滤(如 卫视 / 爱奇艺)
-        limit    每个渠道仅返回前 N 条(1~100)
-        period   realtime/day/week/month(默认 realtime)
-        date     历史快照日期 YYYY-MM-DD, period 为 day/week/month 时必填
-
-    异常: ValueError(参数非法), UapiError(接口错误, 含 code/message/status)。
-    """
     channel, platform, limit, period, date = validate_params(
         channel=channel, platform=platform, limit=limit, period=period, date=date)
 
@@ -269,13 +214,11 @@ def get_movie_rating_rank(channel: str = "all", platform: str | None = None,
             return data
 
         if resp.status_code in _RETRY_STATUS and attempt < max_retries:
-            # 限流(429)或服务器瞬时错误(5xx): 指数退避, 尊重 Retry-After
             delay = _retry_after(resp) or backoff
             time.sleep(delay)
             backoff *= 2
             continue
 
-        # 终态错误: 4xx(参数/快照不存在)或重试耗尽
         code, message = _extract_error(resp)
         raise UapiError(code, message, resp.status_code)
 
@@ -283,7 +226,6 @@ def get_movie_rating_rank(channel: str = "all", platform: str | None = None,
 
 
 if __name__ == "__main__":
-    # 直接运行: 打印一次真实返回, 方便调试/验证接口
     import sys
     if hasattr(sys.stdout, "reconfigure"):
         try:
