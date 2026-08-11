@@ -1,24 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-main.py — 生成 PCL2 影视排行主页 TVPage.xaml (数据源: UAPI 电影收视排行)。
 
-布局:
-    * 一个"影视占比"卡片: 电视收视 / 院线票房 两个环形图(头部 TOP5 相对占比)。
-      环形图用 WPF Path 的 SVG arc 命令绘制(Data="M.. A.. Z"), 不需要额外命名空间。
-    * 每个渠道一个"微博热搜"式排行卡片: 排名 + 剧集名 + 热度值, 挤在一个卡片里,
-      不再每个剧集单独一张卡片。
-    * 支持 SVG 是因为 PCL2 主页基于 WPF, Path 控件的 Data 接受 SVG path 语法。
-
-调用: python main.py                # 默认实时榜, 每渠道前 12 条
-      python main.py --period week --date 2026-08-02   # 历史周榜
-      python main.py --channel tv --limit 20           # 只看电视收视
-      python main.py --fresh                          # 跳过缓存重新拉取
-      python main.py --dry-run                        # 只打印数据, 不生成文件
-
-密钥: 免费档无需密钥; 如需付费档, 设置环境变量 UAPI_API_KEY=<uapi-开头的密钥>,
-      脚本会自动放入 Authorization: Bearer 请求头(见 uapi_api.py)。
-"""
 from __future__ import annotations
 
 import sys
@@ -42,14 +24,13 @@ LABEL = "影视剧热门"
 LIMIT = 12
 TEMPLATE_DIR = "templates"
 OUTPUT_XAML = "TVPage.xaml"
-OUTPUT_INI = "TVPage.xaml.ini"   # PCL2 用于判断页面是否更新的版本号
+OUTPUT_INI = "TVPage.xaml.ini"
 
-# ---------- 环形图参数 ----------
-DONUT_TOP_N = 5          # 每张饼图展示头部 N 条(份额为归一化相对占比)
-DONUT_SIZE = 150         # 画布边长
-DONUT_R = 48             # 环半径(中线)
-DONUT_STROKE = 22        # 环粗细
-# 分类色: 校验过的 8 槽调色板, 固定顺序不循环(第 9 项起并入"其他")
+DONUT_TOP_N = 5          # N条
+DONUT_SIZE = 150
+DONUT_R = 48            
+DONUT_STROKE = 22
+#我是笨比记不住颜色
 PALETTE = [
     "#2a78d6",  # blue
     "#eb6834",  # orange
@@ -61,7 +42,6 @@ PALETTE = [
     "#e34948",  # red
 ]
 
-# channel → 中文描述(接口 channel_desc 缺失时的兜底)
 CHANNEL_DESC = {
     "tv": "电视收视",
     "web": "网络平台",
@@ -69,7 +49,6 @@ CHANNEL_DESC = {
     "all": "全网",
 }
 
-# period → 中文(用于卡片标题, 如 "实时榜"/"日榜"/"周榜"/"月榜")
 PERIOD_CN = {
     "realtime": "实时",
     "day": "日",
@@ -77,11 +56,9 @@ PERIOD_CN = {
     "month": "月",
 }
 
-# 每行"搜索"按钮的搜索引擎(可改): 百度 / cn.bing / google 等
+#搜索拼接
 SEARCH_ENGINE = "https://www.bing.com/search?q="
-# 院线行的"豆瓣查看"入口(豆瓣浏览无需登录, 替代猫眼详情)
 DOUBAN_SEARCH = "https://search.douban.com/movie/subject_search?search_text="
-# 搜索(放大镜)与电影(胶片)图标(用于 MyIconButton)
 SEARCH_ICON = "M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
 MOVIE_ICON = "M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"
 
@@ -109,10 +86,8 @@ def replaces(template: str, data: dict, no_escape_keys=None) -> str:
     return template
 
 
-# ----------------------------- 环形图(饼图) -----------------------------
 
 def parse_pct(value) -> float:
-    """把 '2.8226%' / 2.8 解析成 float; 解析失败返回 0.0。"""
     if value is None:
         return 0.0
     s = str(value).strip().rstrip("%")
@@ -123,7 +98,6 @@ def parse_pct(value) -> float:
 
 
 def donut_slices(group: dict, top_n: int = DONUT_TOP_N) -> list[dict]:
-    """取头部 N 条, 按 metric_rate(份额)归一化到 100%, 分配调色板颜色。"""
     items = group.get("items") or []
     chosen = items[:top_n]
     shares = [parse_pct(it.get("metric_rate")) for it in chosen]
@@ -141,7 +115,6 @@ def donut_slices(group: dict, top_n: int = DONUT_TOP_N) -> list[dict]:
 
 
 def arc_path(cx: float, cy: float, r: float, a1: float, a2: float) -> str:
-    """从 a1 顺时针画到 a2(角度, 12 点方向为 0)的 WPF arc 路径数据(SVG 语法)。"""
     def pt(deg):
         rad = math.radians(deg)
         return (cx + r * math.sin(rad), cy - r * math.cos(rad))
@@ -152,10 +125,9 @@ def arc_path(cx: float, cy: float, r: float, a1: float, a2: float) -> str:
 
 
 def build_donut_canvas(slices: list[dict]) -> str:
-    """把若干扇区画成 Canvas 里叠放的 Path 弧段(环形图)。"""
     cx = cy = DONUT_SIZE / 2
     cur = 0.0
-    gap = 1.5  # 扇区之间的间隔角度, 避免相邻弧段粘连
+    gap = 1.5
     paths = []
     for s in slices:
         angle = s["pct"] / 100 * 360
@@ -180,7 +152,6 @@ def build_donut_canvas(slices: list[dict]) -> str:
 
 
 def build_donut_legend(group: dict, slices: list[dict]) -> str:
-    """环形图右侧图例: 色块 + 剧集名 + 相对占比。文字用主题色, 不用系列色。"""
     desc = group.get("channel_desc") or CHANNEL_DESC.get(group.get("channel"), "排行")
     rows = []
     for s in slices:
@@ -204,11 +175,6 @@ def build_donut_legend(group: dict, slices: list[dict]) -> str:
 
 
 def build_donut_block(group: dict, column: int) -> str:
-    """一个渠道的"环形图 + 图例"块(图例竖排在环形图下方, 放在第 column 列)。
-
-    采用教程「进阶: Grid 布局」的自动缩放方式: 外层 Grid 用星号列(1*),
-    宽度随窗口自适应, 块内宽度 = 环形图与图例的较宽者, 小屏也不会溢出被裁剪。
-    """
     slices = donut_slices(group)
     if not slices:
         return ""
@@ -223,7 +189,6 @@ def build_donut_block(group: dict, column: int) -> str:
 
 
 def build_donut_card(groups: list[dict]) -> str:
-    """"影视占比"卡片: 各渠道环形图放两列星号 Grid, 随窗口宽度自适应。"""
     blocks = [build_donut_block(g, i) for i, g in enumerate(groups)]
     blocks = [b for b in blocks if b]
     if not blocks:
@@ -244,7 +209,6 @@ def build_donut_card(groups: list[dict]) -> str:
     )
 
 
-# --------------------------- 微博热搜式排行 ---------------------------
 
 def format_metric(metric) -> str:
     """热度值显示: '13.5995%' → '13.60%', '2816.31万' 保持原样。"""
@@ -260,10 +224,7 @@ def format_metric(metric) -> str:
 
 
 def build_row_buttons_xaml(item: dict) -> str:
-    """行末按钮: 每行一个"搜索"(必应查该剧集); 院线行额外加"豆瓣查看"(豆瓣浏览无需登录, 替代猫眼详情)。
 
-    是否院线行用 item 是否带 detail_url(猫眼链接) 判断, 有则为院线电影。
-    """
     title = item.get("name") or ""
     search_url = SEARCH_ENGINE + urllib.parse.quote(title)
     parts = [
@@ -286,7 +247,6 @@ def build_row_buttons_xaml(item: dict) -> str:
 
 
 def build_weibo_rows(items: list[dict]) -> str:
-    """微博热搜式行: 排名 | 剧集名 | 热度值 | [搜索][详情]。前 3 名排名用主题强调色。"""
     rows = []
     for index, it in enumerate(items):
         rank = it.get("rank") or index + 1
@@ -314,7 +274,6 @@ def build_weibo_rows(items: list[dict]) -> str:
 
 
 def build_list_card(group: dict, period: str) -> str:
-    """一个渠道的"微博热搜"式排行卡片(单个卡片内排满所有条目)。"""
     items = group.get("items") or []
     if not items:
         return ""
@@ -331,7 +290,6 @@ def build_list_card(group: dict, period: str) -> str:
 
 
 def build_message_xaml(text: str) -> str:
-    """整页提示卡片(无数据 / 无快照时占位, 保证主页不是空白)。"""
     return (
         f'<local:MyCard Margin="5,10,5,5" UseAnimation="False">\n'
         f'    <Grid Margin="14,10">\n'
@@ -344,7 +302,6 @@ def build_message_xaml(text: str) -> str:
 
 
 def render_page(data: dict, args) -> str:
-    """把归一化数据拼成完整 XAML 页面。"""
     def read_tpl(name: str) -> str:
         with open(os.path.join(TEMPLATE_DIR, name), "r", encoding="utf-8") as f:
             return f.read()
@@ -374,7 +331,7 @@ def render_page(data: dict, args) -> str:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="生成 PCL2 影视排行主页 TVPage.xaml (UAPI 电影收视排行)",
+        description="生成 PCL2 影视排行主页 TVPage.xaml",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="示例: python main.py --period week --date 2026-08-02",
     )
